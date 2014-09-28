@@ -1,0 +1,25 @@
+--- ./arch/arm/mach-kirkwood/sheevaplug-setup.c.orig	2011-08-29 14:56:30.000000000 -0600
++++ ./arch/arm/mach-kirkwood/sheevaplug-setup.c	2011-08-31 17:03:59.618732857 -0600
+@@ -65,6 +65,12 @@ static struct gpio_led sheevaplug_led_pi
+ 	},
+ 	{
+ 		.name			= "plug:green:health",
++		.default_trigger	= "none",
++		.gpio			= 48,
++		.active_low		= 1,
++	},
++	{
++		.name			= "plug:blue:health",
+ 		.default_trigger	= "default-on",
+ 		.gpio			= 49,
+ 		.active_low		= 1,
+@@ -87,7 +93,8 @@ static struct platform_device sheevaplug
+ static unsigned int sheevaplug_mpp_config[] __initdata = {
+ 	MPP29_GPIO,	/* USB Power Enable */
+ 	MPP46_GPIO,	/* LED Red */
+-	MPP49_GPIO,	/* LED */
++	MPP48_GPIO,	/* LED Green */
++	MPP49_GPIO,	/* LED Blue */
+ 	0
+ };
+ 

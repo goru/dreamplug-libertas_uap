@@ -1,0 +1,24 @@
+--- ./drivers/staging/zcache/Kconfig.orig	2012-06-22 12:37:50.000000000 -0600
++++ ./drivers/staging/zcache/Kconfig	2012-07-06 04:04:21.012231616 -0600
+@@ -2,8 +2,7 @@ config ZCACHE
+ 	bool "Dynamic compression of swap pages and clean pagecache pages"
+ 	# X86 dependency is because zsmalloc uses non-portable pte/tlb
+ 	# functions
+-	depends on (CLEANCACHE || FRONTSWAP) && CRYPTO=y && X86
+-	select ZSMALLOC
++	depends on (CLEANCACHE || FRONTSWAP) && CRYPTO=y && ZSMALLOC
+ 	select CRYPTO_LZO
+ 	default n
+ 	help
+--- ./drivers/staging/zram/Kconfig.orig	2012-06-22 12:37:50.000000000 -0600
++++ ./drivers/staging/zram/Kconfig	2012-07-06 04:05:27.511858925 -0600
+@@ -2,8 +2,7 @@ config ZRAM
+ 	tristate "Compressed RAM block device support"
+ 	# X86 dependency is because zsmalloc uses non-portable pte/tlb
+ 	# functions
+-	depends on BLOCK && SYSFS && X86
+-	select ZSMALLOC
++	depends on BLOCK && SYSFS && ZSMALLOC
+ 	select LZO_COMPRESS
+ 	select LZO_DECOMPRESS
+ 	default n

@@ -1,0 +1,111 @@
+--- ./arch/arm/mach-dove/gc600_driver_dove/galcore_ko_src/hal/user/gc_hal_user.h.orig	2012-07-08 06:56:49.689729036 -0600
++++ ./arch/arm/mach-dove/gc600_driver_dove/galcore_ko_src/hal/user/gc_hal_user.h	2012-07-14 23:21:00.186138161 -0600
+@@ -2309,4 +2309,3 @@ gcoQUEUE_Commit(
+ #endif
+ 
+ #endif /* __gc_hal_user_h_ */
+-
+--- ./arch/arm/mach-dove/gc600_driver_dove/galcore_ko_src/hal/inc/gc_hal_base.h.orig	2012-07-08 06:56:49.677729182 -0600
++++ ./arch/arm/mach-dove/gc600_driver_dove/galcore_ko_src/hal/inc/gc_hal_base.h	2012-07-14 23:21:00.184138175 -0600
+@@ -694,6 +694,11 @@ gcoOS_GetMilliTime(
+ 
+ char* gcoOS_GetProgramName(char* buf, int size);
+ 
++/* return non-NULL means success. null-terminate guarantee! */
++gctSTRING gcoOS_GetProgramNameWithoutPath(
++    OUT gctSTRING buf,
++    IN const gctSIZE_T size
++    );
+ #if MRVL_BENCH
+ 
+ /*
+@@ -725,6 +730,9 @@ typedef enum _apiBenchIndex  {
+ 	APIBENCH_INDEX_DRAWTEX,
+ 	APIBENCH_INDEX_BUFFERDATA,
+ 	APIBENCH_INDEX_BUFFERSUBDATA,
++	APIBENCH_INDEX_COMPILER_FRONTEND,
++	APIBENCH_INDEX_COMPILER_OPTIMIZING,
++	APIBENCH_INDEX_COMPILER_BACKEND,    /* i.e. LINKER */
+ 	APIBENCH_INDEX_MAX
+ }apiBenchIndex;
+ 
+@@ -746,6 +754,9 @@ typedef enum _apiBenchIndex  {
+ 	"glDrawTex",        \
+ 	"glBufferData",     \
+ 	"glBufferSubData",  \
++	"_glshCompileShader_frontEnd",  \
++	"_glshCompileShader_optimizing",\
++	"_glshLinkShaders", \
+ }
+ 
+ /*
+@@ -777,6 +788,7 @@ typedef struct _gcoTIMER
+  /*  global structure for api bench */
+ typedef struct _gcoAPIBENCH
+ {
++	gctFILE         	file;
+ 	/* frame count */
+ 	gctUINT32			frameCount;
+ 
+@@ -816,6 +828,10 @@ void gcoDUMP_APIBenchInit(
+ 	IN gcoHAL Hal
+ 	);
+ 
++void gcoDUMP_APIBenchDestroy(
++    IN gcoHAL Hal
++    );
++
+ void gcoDUMP_APIBenchFrame(
+ 	IN gcoHAL Hal
+ 	);
+@@ -2627,4 +2643,3 @@ void gcoOS_SetLogFilter(IN unsigned int
+ #endif
+ 
+ #endif /* __gc_hal_base_h_ */
+-
+--- ./arch/arm/mach-dove/gc600_driver_dove/galcore_ko_src/hal/inc/gc_hal_profiler.h.orig	2012-07-08 06:56:49.679729158 -0600
++++ ./arch/arm/mach-dove/gc600_driver_dove/galcore_ko_src/hal/inc/gc_hal_profiler.h	2012-07-14 23:21:00.184138175 -0600
+@@ -127,14 +127,10 @@ typedef struct _gcsPROFILER
+ 
+     /* Clock Info */
+     gctUINT64       		frameStart;
+-    gctUINT64       		frameEnd;
+ 
+     /* Current frame information */
+     gctUINT32       		frameNumber;
+     gctUINT64       		frameStartTimeusec;
+-    gctUINT64       		frameEndTimeusec;
+-    gctUINT64       		frameStartCPUTimeusec;
+-    gctUINT64       		frameEndCPUTimeusec;
+ 
+ #if PROFILE_HAL_COUNTERS
+     gctUINT32       		vertexBufferTotalBytesAlloc;
+@@ -152,12 +148,6 @@ typedef struct _gcsPROFILER
+     int             		textureBufferTotalObjectsAlloc;
+     int             		textureBufferNewObjectsAlloc;
+ 
+-    gctUINT32       		numCommits;
+-    gctUINT32       		drawPointCount;
+-    gctUINT32       		drawLineCount;
+-    gctUINT32       		drawTriangleCount;
+-    gctUINT32       		drawVertexCount;
+-    gctUINT32       		redundantStateChangeCalls;
+ #endif
+ }
+ gcsPROFILER;
+@@ -229,4 +219,3 @@ gcoPROFILER_ShaderFS(
+ #endif
+ 
+ #endif /* __gc_hal_profiler_h_ */
+-
+--- ./arch/arm/mach-dove/gc600_driver_dove/galcore_ko_src/makefile.linux.def.orig	2012-07-08 06:56:49.690729024 -0600
++++ ./arch/arm/mach-dove/gc600_driver_dove/galcore_ko_src/makefile.linux.def	2012-07-14 23:21:00.186138161 -0600
+@@ -191,7 +191,7 @@ endif
+ ifeq ($(DEBUG), 1)
+ 	CFLAGS += -g -fPIC -O0 -DDEBUG -D_DEBUG
+ else
+-	CFLAGS += -O2 -fPIC -g
++	CFLAGS += -O2 -fPIC
+ endif
+ 
+ ifeq ($(EGL_API_FB), 1)

@@ -1,0 +1,116 @@
+--- ./arch/x86/include/asm/tlbflush.h.orig	2012-06-22 12:37:50.000000000 -0600
++++ ./arch/x86/include/asm/tlbflush.h	2012-07-06 12:21:53.707669312 -0600
+@@ -172,4 +172,16 @@ static inline void flush_tlb_kernel_rang
+ 	flush_tlb_all();
+ }
+ 
++static inline void local_flush_tlb_kernel_range(unsigned long start,
++	 unsigned long end)
++{
++	if (cpu_has_invlpg) {
++	 while (start < end) {
++	 __flush_tlb_single(start);
++	 start += PAGE_SIZE;
++	 }
++	} else
++	 local_flush_tlb();
++}
++
+ #endif /* _ASM_X86_TLBFLUSH_H */
+--- ./drivers/staging/zsmalloc/zsmalloc_int.h.orig	2012-06-22 12:37:50.000000000 -0600
++++ ./drivers/staging/zsmalloc/zsmalloc_int.h	2012-07-06 12:11:33.859485310 -0600
+@@ -111,7 +111,6 @@ static const int fullness_threshold_frac
+ 
+ struct mapping_area {
+ 	struct vm_struct *vm;
+-	pte_t *vm_ptes[2];
+ 	char *vm_addr;
+ };
+ 
+--- ./drivers/staging/zsmalloc/Kconfig.orig	2012-06-22 12:37:50.000000000 -0600
++++ ./drivers/staging/zsmalloc/Kconfig	2012-07-06 12:21:08.424169230 -0600
+@@ -1,9 +1,9 @@
+ config ZSMALLOC
+ 	tristate "Memory allocator for compressed pages"
+-	# X86 dependency is because of the use of __flush_tlb_one and set_pte
++	# arch dependency is because of the use of local_unmap_kernel_range
+ 	# in zsmalloc-main.c.
+-	# TODO: convert these to portable functions
+-	depends on X86
++	# TODO: implement local_unmap_kernel_range in all architecture.
++	depends on (ARM || MIPS || SUPERH || X86)
+ 	default n
+ 	help
+ 	  zsmalloc is a slab-based memory allocator designed to store
+--- ./drivers/staging/zsmalloc/zsmalloc-main.c.orig	2012-06-22 12:37:50.000000000 -0600
++++ ./drivers/staging/zsmalloc/zsmalloc-main.c	2012-07-06 12:17:51.034344848 -0600
+@@ -443,7 +443,7 @@ static int zs_cpu_notifier(struct notifi
+ 		area = &per_cpu(zs_map_area, cpu);
+ 		if (area->vm)
+ 			break;
+-		area->vm = alloc_vm_area(2 * PAGE_SIZE, area->vm_ptes);
++		area->vm = alloc_vm_area(2 * PAGE_SIZE, NULL);
+ 		if (!area->vm)
+ 			return notifier_from_errno(-ENOMEM);
+ 		break;
+@@ -692,13 +692,22 @@ void *zs_map_object(struct zs_pool *pool
+ 	} else {
+ 		/* this object spans two pages */
+ 		struct page *nextp;
++		struct page *pages[2];
++		struct page **page_array = &pages[0];
++		int err;
+ 
+ 		nextp = get_next_page(page);
+ 		BUG_ON(!nextp);
+ 
++		page_array[0] = page;
++		page_array[1] = nextp;
+ 
+-		set_pte(area->vm_ptes[0], mk_pte(page, PAGE_KERNEL));
+-		set_pte(area->vm_ptes[1], mk_pte(nextp, PAGE_KERNEL));
++		/*
++		 * map_vm_area never fail because we already allocated
++		 * pages for page table in alloc_vm_area.
++		 */
++		err = map_vm_area(area->vm, PAGE_KERNEL, &page_array);
++		BUG_ON(err);
+ 
+ 		/* We pre-allocated VM area so mapping can never fail */
+ 		area->vm_addr = area->vm->addr;
+@@ -708,6 +717,15 @@ void *zs_map_object(struct zs_pool *pool
+ }
+ EXPORT_SYMBOL_GPL(zs_map_object);
+ 
++static void local_unmap_kernel_range(unsigned long addr, unsigned long size)
++{
++	unsigned long end = addr + size;
++
++	flush_cache_vunmap(addr, end);
++	unmap_kernel_range_noflush(addr, size);
++	local_flush_tlb_kernel_range(addr, end);
++}
++
+ void zs_unmap_object(struct zs_pool *pool, void *handle)
+ {
+ 	struct page *page;
+@@ -726,14 +744,12 @@ void zs_unmap_object(struct zs_pool *poo
+ 	off = obj_idx_to_offset(page, obj_idx, class->size);
+ 
+ 	area = &__get_cpu_var(zs_map_area);
+-	if (off + class->size <= PAGE_SIZE) {
++	if (off + class->size <= PAGE_SIZE)
+ 		kunmap_atomic(area->vm_addr);
+-	} else {
+-		set_pte(area->vm_ptes[0], __pte(0));
+-		set_pte(area->vm_ptes[1], __pte(0));
+-		__flush_tlb_one((unsigned long)area->vm_addr);
+-		__flush_tlb_one((unsigned long)area->vm_addr + PAGE_SIZE);
+-	}
++	else
++		local_unmap_kernel_range((unsigned long)area->vm->addr,
++			PAGE_SIZE * 2);
++
+ 	put_cpu_var(zs_map_area);
+ }
+ EXPORT_SYMBOL_GPL(zs_unmap_object);
